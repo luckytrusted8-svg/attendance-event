@@ -1,0 +1,122 @@
+// Prisma schema — Sistem Manajemen Event & Kehadiran Digital
+// Matches ERD: roles, admins, users, events, registrations, attendances, email_logs
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(50)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  admins Admin[]
+
+  @@map("roles")
+}
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  roleId    Int      @map("role_id")
+  fullname  String   @db.VarChar(150)
+  email     String   @unique @db.VarChar(150)
+  password  String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  role                Role         @relation(fields: [roleId], references: [id])
+  events              Event[]
+  verifiedAttendances Attendance[] @relation("VerifiedBy")
+
+  @@map("admins")
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  fullname    String   @db.VarChar(150)
+  email       String   @db.VarChar(150)
+  phone       String?  @db.VarChar(30)
+  institution String?  @db.VarChar(150)
+  password    String   @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  registrations Registration[]
+
+  @@map("users")
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  adminId     Int      @map("admin_id")
+  title       String   @db.VarChar(200)
+  description String?  @db.Text
+  location    String?  @db.VarChar(255)
+  eventDate   DateTime @map("event_date") @db.Date
+  startTime   DateTime @map("start_time") @db.Time()
+  endTime     DateTime @map("end_time") @db.Time()
+  status      String   @default("draft") @db.VarChar(30) // draft | published | closed
+  bannerBg    String?  @map("banner_bg") @db.VarChar(255)
+  imageUrl    String?  @map("image_url") @db.LongText
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  admin         Admin          @relation(fields: [adminId], references: [id])
+  registrations Registration[]
+
+  @@map("events")
+}
+
+model Registration {
+  id                 Int      @id @default(autoincrement())
+  userId             Int      @map("user_id")
+  eventId            Int      @map("event_id")
+  registrationDate   DateTime @default(now()) @map("registration_date")
+  registrationStatus String   @default("registered") @map("registration_status") @db.VarChar(30)
+  qrCode             String   @unique @map("qr_code") @db.VarChar(255)
+  emailSent          Boolean  @default(false) @map("email_sent")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user       User        @relation(fields: [userId], references: [id])
+  event      Event       @relation(fields: [eventId], references: [id])
+  attendance Attendance?
+  emailLogs  EmailLog[]
+
+  @@map("registrations")
+}
+
+model Attendance {
+  id               Int       @id @default(autoincrement())
+  registrationId   Int       @unique @map("registration_id")
+  checkedByAdmin   Int?      @map("checked_by_admin")
+  checkInTime      DateTime? @map("check_in_time")
+  attendanceMethod String?   @map("attendance_method") @db.VarChar(20) // qr | manual
+  attendanceStatus String?   @default("hadir") @map("attendance_status") @db.VarChar(20)
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  registration Registration @relation(fields: [registrationId], references: [id])
+  admin        Admin?       @relation("VerifiedBy", fields: [checkedByAdmin], references: [id])
+
+  @@map("attendances")
+}
+
+model EmailLog {
+  id             Int      @id @default(autoincrement())
+  registrationId Int      @map("registration_id")
+  recipientEmail String   @map("recipient_email") @db.VarChar(150)
+  subject        String?  @db.VarChar(255)
+  status         String   @db.VarChar(20) // sent | failed
+  sentAt         DateTime @default(now()) @map("sent_at")
+
+  registration Registration @relation(fields: [registrationId], references: [id])
+
+  @@map("email_logs")
+}
