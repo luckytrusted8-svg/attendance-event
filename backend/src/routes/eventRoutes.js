@@ -10,6 +10,7 @@ const {
   updateEventStatus,
   getDashboardStats,
   getDashboardActivity,
+  getWeeklyAttendance,
 } = require('../controllers/eventController');
 const { registerToEvent, listEventRegistrations } = require('../controllers/registrationController');
 const { handleValidation } = require('../middleware/validate');
@@ -17,18 +18,16 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Middleware opsional: jika token tersedia, sisipkan req.admin; jika tidak, biarkan publik (landing page)
 async function optionalAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
   if (!authHeader.startsWith('Bearer ')) return next();
   return requireAuth(req, res, next);
 }
 
-// --- Dashboard (khusus admin) ---
 router.get('/dashboard/stats', requireAuth, getDashboardStats);
 router.get('/dashboard/activity', requireAuth, getDashboardActivity);
+router.get('/dashboard/weekly-attendance', requireAuth, getWeeklyAttendance);
 
-// --- Event CRUD ---
 router.post(
   '/',
   requireAuth,
@@ -58,7 +57,6 @@ router.patch(
   updateEventStatus
 );
 
-// --- Registrations (nested di bawah event) ---
 router.post(
   '/:eventId/registrations',
   [

@@ -95,10 +95,7 @@ async function checkInManual(req, res) {
   }
 }
 
-/**
- * GET /api/attendance/event/:eventId
- * Daftar kehadiran per event, diperbarui otomatis secara berkala (polling) oleh frontend.
- */
+
 async function listAttendanceByEvent(req, res) {
   try {
     const eventId = Number(req.params.eventId);

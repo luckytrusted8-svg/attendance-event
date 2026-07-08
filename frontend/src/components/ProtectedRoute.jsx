@@ -1,7 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-// Membatasi akses halaman berdasarkan status login & role admin yang diizinkan
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { admin } = useAuth();
 

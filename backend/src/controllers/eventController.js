@@ -40,12 +40,6 @@ async function createEvent(req, res) {
   }
 }
 
-/**
- * GET /api/events
- * Daftar event. Publik: hanya status "published", dikelompokkan (ongoing/upcoming/finished).
- * Admin (terautentikasi): seluruh event miliknya / semua event.
- * Query: ?search=&status=&phase=
- */
 async function listEvents(req, res) {
   try {
     const { search = '', phase, status } = req.query;
@@ -84,9 +78,7 @@ async function listEvents(req, res) {
   }
 }
 
-/**
- * GET /api/events/:id
- */
+
 async function getEventById(req, res) {
   try {
     const id = Number(req.params.id);
@@ -107,10 +99,6 @@ async function getEventById(req, res) {
   }
 }
 
-/**
- * GET /api/events/:id/qr
- * QR Code Event -> berisi tautan langsung ke halaman registrasi event (untuk dicetak/disebar)
- */
 async function getEventQr(req, res) {
   try {
     const id = Number(req.params.id);
@@ -125,10 +113,6 @@ async function getEventQr(req, res) {
   }
 }
 
-/**
- * GET /api/events/:id/stats
- * Statistik per event: total pendaftar, total hadir, attendance rate
- */
 async function getEventStats(req, res) {
   try {
     const id = Number(req.params.id);
@@ -146,10 +130,6 @@ async function getEventStats(req, res) {
   }
 }
 
-/**
- * PATCH /api/events/:id/background
- * Mengubah gambar/banner latar event (dipakai juga untuk latar tampilan Scanner per perangkat)
- */
 async function updateEventBackground(req, res) {
   try {
     const id = Number(req.params.id);
@@ -161,10 +141,6 @@ async function updateEventBackground(req, res) {
   }
 }
 
-/**
- * PATCH /api/events/:id/status
- * Mengubah status event: draft | published | closed (khusus Admin Level 1)
- */
 async function updateEventStatus(req, res) {
   try {
     const id = Number(req.params.id);
@@ -179,10 +155,6 @@ async function updateEventStatus(req, res) {
   }
 }
 
-/**
- * GET /api/events/dashboard/stats
- * Ringkasan statistik dashboard: total event, total peserta, event aktif, attendance rate keseluruhan
- */
 async function getDashboardStats(req, res) {
   try {
     const totalEvents = await prisma.event.count();
@@ -201,10 +173,6 @@ async function getDashboardStats(req, res) {
   }
 }
 
-/**
- * GET /api/events/dashboard/activity
- * Log aktivitas terbaru (pendaftaran baru & check-in) lintas seluruh event
- */
 async function getDashboardActivity(req, res) {
   try {
     const recentRegistrations = await prisma.registration.findMany({
@@ -241,6 +209,45 @@ async function getDashboardActivity(req, res) {
   }
 }
 
+async function getWeeklyAttendance(req, res) {
+  try {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push(d);
+    }
+
+    const rangeStart = new Date(days[0]);
+    rangeStart.setHours(0, 0, 0, 0);
+
+    const attendances = await prisma.attendance.findMany({
+      where: { checkInTime: { gte: rangeStart } },
+      select: { checkInTime: true },
+    });
+
+    const dayKey = (d) => d.toISOString().slice(0, 10);
+    const counts = {};
+    days.forEach((d) => { counts[dayKey(d)] = 0; });
+    attendances.forEach((a) => {
+      if (!a.checkInTime) return;
+      const key = dayKey(new Date(a.checkInTime));
+      if (key in counts) counts[key] += 1;
+    });
+
+    const labels = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    const data = days.map((d) => ({
+      date: dayKey(d),
+      label: labels[d.getDay()],
+      total: counts[dayKey(d)],
+    }));
+
+    return res.json({ success: true, data });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server.', error: err.message });
+  }
+}
+
 module.exports = {
   createEvent,
   listEvents,
@@ -251,4 +258,5 @@ module.exports = {
   updateEventStatus,
   getDashboardStats,
   getDashboardActivity,
+  getWeeklyAttendance,
 };

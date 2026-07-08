@@ -1,50 +1,70 @@
 import { Link } from 'react-router-dom';
 
-const phaseLabel = {
-  ongoing: 'Sedang Berlangsung',
-  upcoming: 'Akan Datang',
-  finished: 'Telah Berakhir',
-};
-
-const phaseColor = {
-  ongoing: 'bg-success/10 text-success',
-  upcoming: 'bg-brand-500/10 text-brand-600',
-  finished: 'bg-ink-700/10 text-ink-700/60',
-};
-
 function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function formatTime(timeStr) {
-  const d = new Date(timeStr);
-  return d.toISOString().slice(11, 16);
+  return new Date(timeStr).toISOString().slice(11, 16);
 }
 
+const badgeByPhase = {
+  ongoing: (
+    <span className="inline-flex items-center gap-1.5 bg-red-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live
+    </span>
+  ),
+  upcoming: (
+    <span className="bg-slate-900/80 text-white text-xs font-semibold px-2.5 py-1 rounded-full">Segera</span>
+  ),
+  finished: (
+    <span className="bg-slate-200 text-slate-600 text-xs font-semibold px-2.5 py-1 rounded-full">Selesai</span>
+  ),
+};
+
+const ctaByPhase = {
+  ongoing: 'Gabung Sekarang',
+  upcoming: 'Lihat Detail',
+  finished: 'Lihat Ringkasan',
+};
+
 export default function EventCard({ event }) {
+  const isFinished = event.phase === 'finished';
+
   return (
     <Link
       to={`/events/${event.id}`}
-      className="card overflow-hidden hover:shadow-md transition-shadow flex flex-col"
+      className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex flex-col"
     >
-      <div className="h-36 bg-ink-700/5 flex items-center justify-center overflow-hidden">
+      <div className="relative h-40 bg-slate-100 overflow-hidden">
         {event.imageUrl ? (
-          <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
+          <img
+            src={event.imageUrl}
+            alt={event.title}
+            className={`w-full h-full object-cover ${isFinished ? 'grayscale-[40%] opacity-80' : ''}`}
+          />
         ) : (
-          <span className="font-display text-3xl text-ink-700/20">Ev</span>
+          <div className="w-full h-full flex items-center justify-center text-slate-300 font-extrabold text-3xl">
+            {event.title?.charAt(0) || 'E'}
+          </div>
         )}
+        <div className="absolute top-3 left-3">{badgeByPhase[event.phase]}</div>
       </div>
-      <div className="p-4 flex flex-col gap-2 flex-1">
-        <span className={`badge w-fit ${phaseColor[event.phase] || phaseColor.upcoming}`}>
-          {phaseLabel[event.phase] || event.phase}
-        </span>
-        <h3 className="font-display text-base leading-snug text-ink-900">{event.title}</h3>
-        <p className="text-xs text-ink-700/60">{event.location || 'Lokasi belum ditentukan'}</p>
-        <p className="text-xs text-ink-700/60">
-          {formatDate(event.eventDate)} · {formatTime(event.startTime)}–{formatTime(event.endTime)}
+
+      <div className="p-5 flex flex-col gap-2 flex-1">
+        <h3 className="font-bold text-slate-900 leading-snug line-clamp-2">{event.title}</h3>
+        <p className="text-xs text-slate-500 flex items-center gap-1">
+          📍 {event.location || 'Lokasi menyusul'}
         </p>
-        <div className="mt-auto pt-2 text-xs text-brand-600 font-medium">
-          {event.totalRegistrations ?? 0} pendaftar
+        <p className="text-xs text-slate-500 flex items-center gap-1">
+          🗓 {formatDate(event.eventDate)} · {formatTime(event.startTime)}–{formatTime(event.endTime)}
+        </p>
+
+        <div className="mt-auto pt-3 flex items-center justify-between">
+          <span className="text-xs text-slate-400">{event.totalRegistrations ?? 0} pendaftar</span>
+          <span className="text-sm font-semibold text-blue-600 group-hover:translate-x-0.5 transition-transform">
+            {ctaByPhase[event.phase]} →
+          </span>
         </div>
       </div>
     </Link>

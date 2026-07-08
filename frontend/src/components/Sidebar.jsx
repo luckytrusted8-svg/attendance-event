@@ -1,27 +1,28 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import {
+  LayoutGrid, Calendar, ScanLine, Users, ShieldCheck, KeyRound,
+  BarChart3, Mail, User, Settings, LogOut,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const iconClass = 'w-4 h-4';
-
-// Menu Admin Level 1: akses penuh (event, laporan, data pengguna, admin, role)
 const level1Menu = [
-  { to: '/admin/dashboard', label: 'Dashboard', key: 'grid' },
-  { to: '/admin/events', label: 'Kelola Event', key: 'calendar' },
-  { to: '/admin/scanner', label: 'Scanner Kehadiran', key: 'scan' },
-  { to: '/admin/users', label: 'Data Peserta', key: 'users' },
-  { to: '/admin/admins', label: 'Manajemen Admin', key: 'shield' },
-  { to: '/admin/roles', label: 'Role', key: 'key' },
-  { to: '/admin/reports', label: 'Laporan', key: 'chart' },
-  { to: '/admin/email-logs', label: 'Log Email', key: 'mail' },
-  { to: '/admin/profile', label: 'Profil', key: 'user' },
-  { to: '/admin/settings', label: 'Pengaturan', key: 'settings' },
+  { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid },
+  { to: '/admin/events', label: 'Kelola Event', icon: Calendar },
+  { to: '/admin/scanner', label: 'Scanner Kehadiran', icon: ScanLine },
+  { to: '/admin/users', label: 'Data Peserta', icon: Users },
+  { to: '/admin/admins', label: 'Manajemen Admin', icon: ShieldCheck },
+  { to: '/admin/roles', label: 'Role', icon: KeyRound },
+  { to: '/admin/reports', label: 'Laporan', icon: BarChart3 },
+  { to: '/admin/email-logs', label: 'Log Email', icon: Mail },
 ];
 
-// Menu Admin Level 2 (lapangan): hanya scanner & kehadiran
+const bottomMenu = [
+  { to: '/admin/profile', label: 'Profil', icon: User },
+  { to: '/admin/settings', label: 'Pengaturan', icon: Settings },
+];
+
 const level2Menu = [
-  { to: '/admin/scanner', label: 'Scanner Kehadiran', key: 'scan' },
-  { to: '/admin/profile', label: 'Profil', key: 'user' },
-  { to: '/admin/settings', label: 'Pengaturan', key: 'settings' },
+  { to: '/admin/scanner', label: 'Scanner Kehadiran', icon: ScanLine },
 ];
 
 export default function Sidebar() {
@@ -35,36 +36,60 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-64 shrink-0 bg-ink-950 text-white flex flex-col h-screen sticky top-0">
-      <div className="px-5 py-6 border-b border-white/10">
-        <p className="font-display text-lg leading-tight">Event & Kehadiran</p>
-        <p className="text-[11px] tracking-wide uppercase text-white/40 mt-1">Digital Platform</p>
+    <aside className="w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0">
+      <div className="px-5 py-6">
+        <p className="text-lg font-extrabold tracking-tight text-slate-900">
+          Event<span className="text-blue-600">Digital</span>
+        </p>
+        <p className="text-xs text-slate-400 mt-0.5">Admin Dashboard</p>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {menu.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                isActive ? 'bg-brand-600 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'
-              }`
-            }
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-            {item.label}
-          </NavLink>
-        ))}
+      <nav className="flex-1 overflow-y-auto px-3 space-y-1">
+        {menu.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                }`
+              }
+            >
+              <Icon className="w-[18px] h-[18px]" strokeWidth={2} />
+              {item.label}
+            </NavLink>
+          );
+        })}
+
+        <div className="pt-4 mt-4 border-t border-slate-100 space-y-1">
+          {bottomMenu.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                  }`
+                }
+              >
+                <Icon className="w-[18px] h-[18px]" strokeWidth={2} />
+                {item.label}
+              </NavLink>
+            );
+          })}
+        </div>
       </nav>
 
-      <div className="px-4 py-4 border-t border-white/10">
-        <p className="text-xs text-white/50 truncate">{admin?.fullname}</p>
-        <p className="text-[11px] text-white/30 truncate mb-3">{admin?.role}</p>
+      <div className="p-3">
         <button
           onClick={handleLogout}
-          className="w-full text-sm bg-white/5 hover:bg-white/10 text-white/80 rounded-md py-2 transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
         >
+          <LogOut className="w-[18px] h-[18px]" strokeWidth={2} />
           Keluar
         </button>
       </div>

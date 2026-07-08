@@ -17,7 +17,6 @@ export default function Settings() {
   async function handleSave() {
     if (!selectedEvent) return;
     await api.patch(`/events/${selectedEvent}/background`, { bannerBg: color });
-    // Preferensi tampilan scanner disimpan per perangkat (localStorage)
     localStorage.setItem('scanner_bg', color);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);

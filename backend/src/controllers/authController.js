@@ -52,10 +52,6 @@ async function loginAdmin(req, res) {
   }
 }
 
-/**
- * GET /api/auth/admin
- * Mengambil profil admin yang sedang login (dari token)
- */
 async function getMyProfile(req, res) {
   try {
     const admin = await prisma.admin.findUnique({

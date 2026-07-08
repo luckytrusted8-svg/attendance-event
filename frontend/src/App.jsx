@@ -22,17 +22,15 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Publik */}
+       
           <Route path="/" element={<LandingPage />} />
           <Route path="/events/:id" element={<EventDetail />} />
           <Route path="/admin/login" element={<AdminLogin />} />
 
-          {/* Admin Level 1 & Level 2 */}
           <Route path="/admin/scanner" element={<ProtectedRoute allowedRoles={['Admin Level 1', 'Admin Level 2']}><Scanner /></ProtectedRoute>} />
           <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={['Admin Level 1', 'Admin Level 2']}><Profile /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['Admin Level 1', 'Admin Level 2']}><Settings /></ProtectedRoute>} />
 
-          {/* Khusus Admin Level 1 */}
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['Admin Level 1']}><Dashboard /></ProtectedRoute>} />
           <Route path="/admin/events" element={<ProtectedRoute allowedRoles={['Admin Level 1']}><EventsManagement /></ProtectedRoute>} />
           <Route path="/admin/events/:id/participants" element={<ProtectedRoute allowedRoles={['Admin Level 1']}><EventParticipants /></ProtectedRoute>} />
