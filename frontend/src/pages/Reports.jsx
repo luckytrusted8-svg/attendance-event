@@ -20,9 +20,6 @@ function formatRupiahShort(n) {
   if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}jt`;
   return formatRupiah(n);
 }
-function initialsOf(name = '') {
-  return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-}
 
 export default function Reports() {
   const [data, setData] = useState(null);
@@ -199,14 +196,9 @@ export default function Reports() {
               {perEvent.map((e) => (
                 <tr key={e.eventId} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
                   <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold shrink-0">
-                        {initialsOf(e.title)}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-900 leading-tight">{e.title}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">{e.location || e.category || '-'}</p>
-                      </div>
+                    <div>
+                      <p className="font-semibold text-slate-900 leading-tight">{e.title}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{e.location || e.category || '-'}</p>
                     </div>
                   </td>
                   <td className="p-4 text-slate-600">{new Date(e.eventDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>

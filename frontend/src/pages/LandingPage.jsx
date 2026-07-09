@@ -68,7 +68,7 @@ export default function LandingPage() {
           </h1>
           <p className="text-slate-500 max-w-xl mt-5 leading-relaxed">
             Temukan seminar, workshop, dan konferensi yang sedang berlangsung, akan datang, maupun yang sudah
-            terlaksana — semuanya dalam satu tempat.
+            terlaksana  semuanya dalam satu tempat.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 mt-8">

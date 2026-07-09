@@ -8,15 +8,7 @@ import api from '../api/axios';
 import DashboardLayout from '../components/DashboardLayout';
 
 const PAGE_SIZE = 10;
-const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500'];
 
-function initialsOf(name = '') {
-  return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-}
-function avatarColor(name = '') {
-  const sum = [...name].reduce((a, c) => a + c.charCodeAt(0), 0);
-  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
-}
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
@@ -252,7 +244,7 @@ export default function Users() {
         </button>
       }
     >
-      {/* Stat cards — data asli, tanpa angka fiktif */}
+      {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-2xl border border-slate-200 p-5">
           <p className="text-sm text-slate-500 mb-1">Total Peserta</p>
@@ -322,12 +314,7 @@ export default function Users() {
                       <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleSelect(u.id)} className="rounded border-slate-300" />
                     </td>
                     <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-full ${avatarColor(u.fullname)} text-white flex items-center justify-center text-xs font-bold shrink-0`}>
-                          {initialsOf(u.fullname)}
-                        </div>
-                        <span className="font-semibold text-slate-800">{u.fullname}</span>
-                      </div>
+                      <span className="font-semibold text-slate-800">{u.fullname}</span>
                     </td>
                     <td className="p-4 text-slate-600">{u.email}</td>
                     <td className="p-4 text-slate-600">{u.phone || '-'}</td>

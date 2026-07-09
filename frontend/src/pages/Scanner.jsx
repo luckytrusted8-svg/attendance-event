@@ -5,15 +5,6 @@ import { CheckCircle2, XCircle, Printer, ChevronDown } from 'lucide-react';
 import api from '../api/axios';
 import DashboardLayout from '../components/DashboardLayout';
 
-const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500'];
-
-function initialsOf(name = '') {
-  return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-}
-function avatarColor(name = '') {
-  const sum = [...name].reduce((a, c) => a + c.charCodeAt(0), 0);
-  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
-}
 function formatClock(date) {
   return new Date(date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
@@ -205,9 +196,6 @@ export default function Scanner() {
               {result.status === 'success' && result.participant ? (
                 <>
                   <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3 mb-4">
-                    <div className={`w-12 h-12 rounded-full ${avatarColor(result.participant.fullname)} text-white flex items-center justify-center font-bold shrink-0`}>
-                      {initialsOf(result.participant.fullname)}
-                    </div>
                     <div className="min-w-0">
                       <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">Nama Peserta</p>
                       <p className="font-bold text-slate-900 truncate">{result.participant.fullname}</p>
@@ -254,9 +242,6 @@ export default function Scanner() {
               <ul className="space-y-3 max-h-96 overflow-y-auto">
                 {feed.slice(0, 8).map((a) => (
                   <li key={a.id} className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full ${avatarColor(a.fullname)} text-white flex items-center justify-center text-xs font-bold shrink-0`}>
-                      {initialsOf(a.fullname)}
-                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-slate-800 truncate">{a.fullname}</p>
                       <p className="text-xs text-slate-400 truncate">{a.qrCode} · {a.method === 'qr' ? 'QR Scan' : 'Manual'}</p>
