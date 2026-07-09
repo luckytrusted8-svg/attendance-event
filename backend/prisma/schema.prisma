@@ -123,12 +123,14 @@ model Attendance {
 }
 
 model EmailLog {
-  id             Int      @id @default(autoincrement())
-  registrationId Int      @map("registration_id")
-  recipientEmail String   @map("recipient_email") @db.VarChar(150)
-  subject        String?  @db.VarChar(255)
-  status         String   @db.VarChar(20) // sent | failed
-  sentAt         DateTime @default(now()) @map("sent_at")
+  id             Int       @id @default(autoincrement())
+  registrationId Int       @map("registration_id")
+  recipientEmail String    @map("recipient_email") @db.VarChar(150)
+  subject        String?   @db.VarChar(255)
+  status         String    @db.VarChar(20) // pending | sent | failed
+  errorDetail    String?   @map("error_detail") @db.Text
+  openedAt       DateTime? @map("opened_at") // diisi otomatis saat tracking pixel di email diakses (email dibuka)
+  sentAt         DateTime  @default(now()) @map("sent_at")
 
   registration Registration @relation(fields: [registrationId], references: [id])
 

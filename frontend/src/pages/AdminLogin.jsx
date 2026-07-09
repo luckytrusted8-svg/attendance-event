@@ -80,11 +80,12 @@ export default function AdminLogin() {
             Beranda
           </Link>
 
-          <div className="w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center mx-auto mb-5">
-            <svg viewBox="0 0 24 24" fill="none" width="26" height="26">
-              <circle cx="12" cy="12" r="9" stroke="#6366F1" strokeWidth="2" />
-              <path d="M8.5 12.5l2.2 2.2L16 10" stroke="#6366F1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          <div className="w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center mx-auto mb-5 overflow-hidden">
+            <img 
+              src="/Logo.png" 
+              alt="Logo" 
+              className="w-full h-full object-contain" 
+            />
           </div>
 
           <h2 className="text-lg text-center text-slate-700 mb-8">
@@ -106,7 +107,7 @@ export default function AdminLogin() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin1@event.com"
+                  placeholder="contoh@event.com"
                   className="w-full pl-10 pr-3 py-3 rounded-lg bg-white border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent shadow-sm"
                 />
               </div>

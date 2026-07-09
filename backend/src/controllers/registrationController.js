@@ -58,8 +58,9 @@ async function registerToEvent(req, res) {
       registrationId: registration.id,
       recipientEmail: user.email,
       recipientName: user.fullname,
-      eventTitle: event.title,
+      qrCode,
       qrDataUrl,
+      event,
     }).catch((e) => console.error('Email QR gagal terkirim:', e.message));
 
     return res.status(201).json({
@@ -169,8 +170,9 @@ async function manualRegisterToEvent(req, res) {
       registrationId: registration.id,
       recipientEmail: user.email,
       recipientName: user.fullname,
-      eventTitle: event.title,
+      qrCode,
       qrDataUrl,
+      event,
     }).catch((e) => console.error('Email QR gagal terkirim:', e.message));
 
     return res.status(201).json({

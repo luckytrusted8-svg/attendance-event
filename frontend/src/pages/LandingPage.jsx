@@ -46,9 +46,8 @@ export default function LandingPage() {
 
   useEffect(() => {
     fetchEvents();
-    const interval = setInterval(fetchEvents, 8000); // polling real-time (PRD 8.2)
+    const interval = setInterval(fetchEvents, 8000); 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
   const byPhase = (phase) => events.filter((e) => e.phase === phase);

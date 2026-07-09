@@ -1,523 +1,262 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Mail, CheckCircle2, XCircle, Eye, RefreshCw, Send, ChevronLeft, ChevronRight, ChevronDown, ShieldCheck,
+} from 'lucide-react';
 import api from '../api/axios';
 import DashboardLayout from '../components/DashboardLayout';
-import StatCard from '../components/StatCard';
+
+const PAGE_SIZE = 8;
 
 export default function EmailLogs() {
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  const [eventFilter, setEventFilter] = useState('');
-  const [sortBy, setSortBy] = useState('latest');
-  const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    perPage: 10,
-    total: 0
-  });
+  const [statusFilter, setStatusFilter] = useState('');
+  const [eventFilter, setEventFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [resendingId, setResendingId] = useState(null);
+  const [smtpResult, setSmtpResult] = useState(null);
+  const [checkingSmtp, setCheckingSmtp] = useState(false);
 
-  async function fetchEvents() {
-    try {
-      const res = await api.get('/events', { params: { limit: 100 } });
-      setEvents(res.data.data || []);
-    } catch (err) {
-      console.error('Error fetching events:', err);
-    }
-  }
-
-  async function fetchData(page = 1) {
+  async function fetchData() {
     setLoading(true);
     try {
-      const params = {
-        page,
-        limit: pagination.perPage,
-        status: statusFilter || undefined,
-        search: search || undefined,
-        startDate: dateRange.start || undefined,
-        endDate: dateRange.end || undefined,
-        eventId: eventFilter || undefined,
-        sort: sortBy || undefined
-      };
-
       const [logsRes, statsRes] = await Promise.all([
-        api.get('/notifications/email-logs', { params }),
+        api.get('/notifications/email-logs', {
+          params: {
+            status: statusFilter || undefined,
+            eventId: eventFilter || undefined,
+            dateFrom: dateFrom || undefined,
+            dateTo: dateTo || undefined,
+          },
+        }),
         api.get('/notifications/email-logs/stats'),
       ]);
-
       setLogs(logsRes.data.data);
       setStats(statsRes.data.data);
-      
-      // Update pagination info
-      if (logsRes.data.pagination) {
-        setPagination({
-          currentPage: logsRes.data.pagination.currentPage || page,
-          totalPages: logsRes.data.pagination.totalPages || 1,
-          perPage: logsRes.data.pagination.perPage || 10,
-          total: logsRes.data.pagination.total || 0
-        });
-      }
-    } catch (err) {
-      console.error('Error fetching email logs:', err);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchEvents();
-    fetchData(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    api.get('/events').then((res) => setEvents(res.data.data));
   }, []);
 
-  // Fetch data when filters change
   useEffect(() => {
-    fetchData(1);
+    fetchData();
+    setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, search, dateRange, eventFilter, sortBy]);
+  }, [statusFilter, eventFilter, dateFrom, dateTo]);
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (search !== undefined) {
-        fetchData(1);
-      }
-    }, 500);
+  const totalPages = Math.max(Math.ceil(logs.length / PAGE_SIZE), 1);
+  const paginated = useMemo(() => logs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [logs, page]);
 
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
-
-  // Reset all filters
-  function resetFilters() {
-    setSearch('');
-    setStatusFilter('');
-    setDateRange({ start: '', end: '' });
-    setEventFilter('');
-    setSortBy('latest');
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
-  }
-
-  // Handle page change
-  function handlePageChange(newPage) {
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      fetchData(newPage);
-    }
-  }
-
-  // Format date for display
-  function formatDate(dateString) {
-    if (!dateString) return '-';
+  async function handleResend(id) {
+    setResendingId(id);
     try {
-      return new Date(dateString).toLocaleString('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return dateString;
+      await api.post(`/notifications/email-logs/${id}/resend`);
+      fetchData();
+    } finally {
+      setResendingId(null);
     }
   }
 
-  // Get status badge class
-  function getStatusBadge(status) {
-    switch(status) {
-      case 'sent':
-        return 'bg-success/10 text-success';
-      case 'failed':
-        return 'bg-danger/10 text-danger';
-      case 'pending':
-        return 'bg-warning/10 text-warning';
-      default:
-        return 'bg-ink-700/10 text-ink-700/60';
+  async function handleCheckSmtp() {
+    setCheckingSmtp(true);
+    setSmtpResult(null);
+    try {
+      const res = await api.get('/notifications/smtp-status');
+      setSmtpResult({ ok: res.data.success, message: res.data.message });
+    } catch (err) {
+      setSmtpResult({ ok: false, message: err.response?.data?.message || 'Gagal menghubungi server.' });
+    } finally {
+      setCheckingSmtp(false);
     }
-  }
-
-  // Get status label
-  function getStatusLabel(status) {
-    switch(status) {
-      case 'sent':
-        return '✅ Terkirim';
-      case 'failed':
-        return '❌ Gagal';
-      case 'pending':
-        return '⏳ Pending';
-      default:
-        return status || 'Tidak diketahui';
-    }
-  }
-
-  // Generate pagination buttons
-  function renderPaginationButtons() {
-    const buttons = [];
-    const { currentPage, totalPages } = pagination;
-    
-    if (totalPages <= 1) return buttons;
-
-    // Previous button
-    buttons.push(
-      <button
-        key="prev"
-        onClick={() => handlePageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        className="px-3 py-1.5 rounded-md text-sm border border-ink-700/10 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-ink-700/5 transition-colors"
-      >
-        ← Prev
-      </button>
-    );
-
-    // Page numbers
-    const maxVisible = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-    
-    if (endPage - startPage < maxVisible - 1) {
-      startPage = Math.max(1, endPage - maxVisible + 1);
-    }
-
-    if (startPage > 1) {
-      buttons.push(
-        <button
-          key={1}
-          onClick={() => handlePageChange(1)}
-          className="px-3 py-1.5 rounded-md text-sm hover:bg-ink-700/5 transition-colors"
-        >
-          1
-        </button>
-      );
-      if (startPage > 2) {
-        buttons.push(<span key="ellipsis1" className="px-2 text-ink-700/40">...</span>);
-      }
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      buttons.push(
-        <button
-          key={i}
-          onClick={() => handlePageChange(i)}
-          className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-            i === currentPage 
-              ? 'bg-brand-600 text-white' 
-              : 'hover:bg-ink-700/5'
-          }`}
-        >
-          {i}
-        </button>
-      );
-    }
-
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        buttons.push(<span key="ellipsis2" className="px-2 text-ink-700/40">...</span>);
-      }
-      buttons.push(
-        <button
-          key={totalPages}
-          onClick={() => handlePageChange(totalPages)}
-          className="px-3 py-1.5 rounded-md text-sm hover:bg-ink-700/5 transition-colors"
-        >
-          {totalPages}
-        </button>
-      );
-    }
-
-    // Next button
-    buttons.push(
-      <button
-        key="next"
-        onClick={() => handlePageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        className="px-3 py-1.5 rounded-md text-sm border border-ink-700/10 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-ink-700/5 transition-colors"
-      >
-        Next →
-      </button>
-    );
-
-    return buttons;
-  }
-
-  // Get search placeholder text
-  function getSearchPlaceholder() {
-    const fields = ['Nama', 'Email', 'Event'];
-    return `🔍 Cari ${fields.join(', ')}...`;
   }
 
   return (
-    <DashboardLayout title="Log Email" subtitle="Riwayat pengiriman QR Code ke peserta.">
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Total Terkirim" value={stats.total} icon="📧" />
-          <StatCard label="Berhasil" value={stats.sent} icon="✅" />
-          <StatCard label="Gagal" value={stats.failed || 0} icon="❌" />
-          <StatCard label="Success Rate" value={`${stats.successRate || 0}%`} icon="📊" />
+    <DashboardLayout
+      title="Log Email"
+      subtitle="Pantau riwayat pengiriman email otomatis sistem."
+      actions={
+        <button onClick={fetchData} className="flex items-center gap-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold px-4 py-2.5 rounded-lg text-sm">
+          <RefreshCw className="w-4 h-4" /> Refresh
+        </button>
+      }
+    >
+      {/* Stat cards — semuanya data asli */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3"><Mail className="w-5 h-5" /></div>
+          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Total Terkirim</p>
+          <p className="text-2xl font-extrabold text-slate-900 mt-1">{stats ? stats.sent.toLocaleString('id-ID') : '-'}</p>
         </div>
-      )}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="w-10 h-10 rounded-lg bg-red-50 text-red-500 flex items-center justify-center mb-3"><XCircle className="w-5 h-5" /></div>
+          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Gagal Kirim</p>
+          <p className="text-2xl font-extrabold text-slate-900 mt-1">{stats ? stats.failed.toLocaleString('id-ID') : '-'}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3"><CheckCircle2 className="w-5 h-5" /></div>
+          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Success Rate</p>
+          <p className="text-2xl font-extrabold text-slate-900 mt-1">{stats ? `${stats.successRate}%` : '-'}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="w-10 h-10 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center mb-3"><Eye className="w-5 h-5" /></div>
+          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Laju Terbuka</p>
+          <p className="text-2xl font-extrabold text-slate-900 mt-1">{stats ? `${stats.openRate}%` : '-'}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{stats?.opened || 0} dari {stats?.sent || 0} terkirim dibuka</p>
+        </div>
+      </div>
 
-      {/* Filter Section */}
-      <div className="mb-4 space-y-3">
-        <div className="flex flex-wrap gap-3">
-          {/* Search */}
-          <div className="flex-1 min-w-[200px]">
+      {/* Filters */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-5">
+        <div className="grid md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Status Email</label>
             <div className="relative">
-              <input
-                type="text"
-                placeholder={getSearchPlaceholder()}
-                className="input-field pl-10"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-700/40">🔍</span>
-              {search && (
-                <button
-                  onClick={() => setSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-700/40 hover:text-ink-700"
-                >
-                  ✕
-                </button>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full appearance-none px-3 py-2.5 pr-8 rounded-lg border border-slate-200 text-sm">
+                <option value="">Semua Status</option>
+                <option value="sent">Terkirim</option>
+                <option value="failed">Gagal</option>
+                <option value="pending">Pending</option>
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Dari Tanggal</label>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Sampai Tanggal</label>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Event</label>
+            <div className="relative">
+              <select value={eventFilter} onChange={(e) => setEventFilter(e.target.value)} className="w-full appearance-none px-3 py-2.5 pr-8 rounded-lg border border-slate-200 text-sm">
+                <option value="">Semua Event</option>
+                {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-500 bg-slate-50 border-b border-slate-200">
+                <th className="p-4 font-semibold">Penerima</th>
+                <th className="p-4 font-semibold">Event</th>
+                <th className="p-4 font-semibold">Subjek</th>
+                <th className="p-4 font-semibold">Status</th>
+                <th className="p-4 font-semibold">Dibuka</th>
+                <th className="p-4 font-semibold">Waktu</th>
+                <th className="p-4 font-semibold text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} className="p-10 text-center text-slate-400">Memuat data...</td></tr>
+              ) : paginated.length === 0 ? (
+                <tr><td colSpan={7} className="p-10 text-center text-slate-400">Belum ada log email.</td></tr>
+              ) : (
+                paginated.map((l) => (
+                  <tr key={l.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
+                    <td className="p-4">
+                      <p className="font-semibold text-slate-800">{l.recipientName}</p>
+                      <p className="text-xs text-slate-400">{l.recipientEmail} · ID Peserta #{l.userId}</p>
+                    </td>
+                    <td className="p-4 text-slate-600">{l.eventTitle}</td>
+                    <td className="p-4 text-slate-600">{l.subject}</td>
+                    <td className="p-4">
+                      <span
+                        title={l.status === 'failed' ? (l.errorDetail || 'Tidak ada detail error.') : undefined}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          l.status === 'sent' ? 'bg-blue-50 text-blue-600'
+                          : l.status === 'failed' ? 'bg-red-50 text-red-500 cursor-help'
+                          : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${l.status === 'sent' ? 'bg-blue-600' : l.status === 'failed' ? 'bg-red-500' : 'bg-slate-400'}`} />
+                        {l.status === 'sent' ? 'Terkirim' : l.status === 'failed' ? 'Gagal ⓘ' : 'Pending'}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      {l.opened ? (
+                        <span className="text-xs font-medium text-emerald-600">Ya</span>
+                      ) : (
+                        <span className="text-xs text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="p-4 text-xs text-slate-500">{new Date(l.sentAt).toLocaleString('id-ID')}</td>
+                    <td className="p-4 text-right">
+                      {l.status === 'failed' && (
+                        <button
+                          onClick={() => handleResend(l.id)}
+                          disabled={resendingId === l.id}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:underline disabled:opacity-50"
+                        >
+                          <Send className="w-3.5 h-3.5" /> {resendingId === l.id ? 'Mengirim...' : 'Kirim Ulang'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
               )}
-            </div>
-            <div className="text-xs text-ink-700/40 mt-1">
-              💡 Cari berdasarkan nama peserta, email, atau judul event
-            </div>
-          </div>
-
-          {/* Event Filter */}
-          <select
-            className="input-field w-auto min-w-[160px]"
-            value={eventFilter}
-            onChange={(e) => setEventFilter(e.target.value)}
-          >
-            <option value="">📋 Semua Event</option>
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.title}
-              </option>
-            ))}
-          </select>
-
-          {/* Status Filter */}
-          <select
-            className="input-field w-auto min-w-[140px]"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">📊 Semua Status</option>
-            <option value="sent">✅ Terkirim</option>
-            <option value="failed">❌ Gagal</option>
-            <option value="pending">⏳ Pending</option>
-          </select>
-
-          {/* Sort By */}
-          <select
-            className="input-field w-auto min-w-[140px]"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-          >
-            <option value="latest">🕐 Terbaru</option>
-            <option value="oldest">🕐 Terlama</option>
-          </select>
+            </tbody>
+          </table>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          {/* Date Range */}
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              className="input-field w-auto"
-              value={dateRange.start}
-              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-              placeholder="Dari"
-            />
-            <span className="text-ink-700/40">-</span>
-            <input
-              type="date"
-              className="input-field w-auto"
-              value={dateRange.end}
-              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-              placeholder="Sampai"
-            />
-          </div>
-
-          {/* Reset Button */}
-          {(search || statusFilter || dateRange.start || dateRange.end || eventFilter || sortBy !== 'latest') && (
-            <button
-              onClick={resetFilters}
-              className="btn-secondary whitespace-nowrap"
-            >
-              Reset Filter
-            </button>
-          )}
-        </div>
-
-        {/* Active Filters Info */}
-        {(search || statusFilter || dateRange.start || dateRange.end || eventFilter || sortBy !== 'latest') && (
-          <div className="flex flex-wrap gap-2 pt-2">
-            <span className="text-sm text-ink-700/50">Filter aktif:</span>
-            {search && (
-              <span className="badge bg-brand-50 text-brand-600">
-                🔍 {search}
-                <button
-                  onClick={() => setSearch('')}
-                  className="ml-1 hover:text-brand-800"
-                >
-                  ✕
-                </button>
-              </span>
-            )}
-            {eventFilter && events.find(e => e.id === parseInt(eventFilter)) && (
-              <span className="badge bg-brand-50 text-brand-600">
-                📋 {events.find(e => e.id === parseInt(eventFilter))?.title}
-                <button
-                  onClick={() => setEventFilter('')}
-                  className="ml-1 hover:text-brand-800"
-                >
-                  ✕
-                </button>
-              </span>
-            )}
-            {statusFilter && (
-              <span className="badge bg-brand-50 text-brand-600">
-                📊 {statusFilter === 'sent' ? 'Terkirim' : statusFilter === 'failed' ? 'Gagal' : 'Pending'}
-                <button
-                  onClick={() => setStatusFilter('')}
-                  className="ml-1 hover:text-brand-800"
-                >
-                  ✕
-                </button>
-              </span>
-            )}
-            {dateRange.start && (
-              <span className="badge bg-brand-50 text-brand-600">
-                📅 Dari: {new Date(dateRange.start).toLocaleDateString('id-ID')}
-                <button
-                  onClick={() => setDateRange({ ...dateRange, start: '' })}
-                  className="ml-1 hover:text-brand-800"
-                >
-                  ✕
-                </button>
-              </span>
-            )}
-            {dateRange.end && (
-              <span className="badge bg-brand-50 text-brand-600">
-                📅 Sampai: {new Date(dateRange.end).toLocaleDateString('id-ID')}
-                <button
-                  onClick={() => setDateRange({ ...dateRange, end: '' })}
-                  className="ml-1 hover:text-brand-800"
-                >
-                  ✕
-                </button>
-              </span>
-            )}
-            {sortBy !== 'latest' && (
-              <span className="badge bg-brand-50 text-brand-600">
-                🕐 {sortBy === 'oldest' ? 'Terlama' : 'Terbaru'}
-              </span>
-            )}
+        {!loading && logs.length > 0 && (
+          <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100">
+            <p className="text-sm text-slate-400">
+              Menampilkan {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, logs.length)} dari {logs.length} entri
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="w-8 h-8 rounded-lg border border-slate-200 text-slate-500 disabled:opacity-40 flex items-center justify-center hover:bg-slate-50">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 5).map((p) => (
+                <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded-lg text-sm font-medium ${p === page ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>{p}</button>
+              ))}
+              <button disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className="w-8 h-8 rounded-lg border border-slate-200 text-slate-500 disabled:opacity-40 flex items-center justify-center hover:bg-slate-50">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Table */}
-      <div className="card overflow-x-auto">
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div>
-            <p className="ml-3 text-ink-700/60">Memuat log email...</p>
-          </div>
-        ) : (
-          <>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-ink-700/50 border-b border-ink-700/10 bg-brand-50/50">
-                  <th className="p-3 font-medium">Penerima</th>
-                  <th className="p-3 font-medium">Event</th>
-                  <th className="p-3 font-medium">Subjek</th>
-                  <th className="p-3 font-medium">Status</th>
-                  <th className="p-3 font-medium">Waktu</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((l) => (
-                  <tr key={l.id} className="border-b border-ink-700/5 last:border-0 hover:bg-ink-700/5 transition-colors">
-                    <td className="p-3">
-                      <div className="font-medium text-ink-900">{l.recipientName || '-'}</div>
-                      <div className="text-xs text-ink-700/40">{l.recipientEmail}</div>
-                    </td>
-                    <td className="p-3">
-                      <div className="font-medium text-ink-900">{l.eventTitle || '-'}</div>
-                      {l.eventDate && (
-                        <div className="text-xs text-ink-700/40">
-                          📅 {new Date(l.eventDate).toLocaleDateString('id-ID')}
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-3 max-w-[200px] truncate" title={l.subject}>
-                      {l.subject || '-'}
-                    </td>
-                    <td className="p-3">
-                      <span className={`badge ${getStatusBadge(l.status)}`}>
-                        {getStatusLabel(l.status)}
-                      </span>
-                      {l.errorMessage && (
-                        <div className="text-xs text-danger mt-1 max-w-[150px] truncate" title={l.errorMessage}>
-                          {l.errorMessage}
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-3 text-xs text-ink-700/60">
-                      {formatDate(l.sentAt)}
-                    </td>
-                  </tr>
-                ))}
-                {logs.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-ink-700/40">
-                      {search || statusFilter || dateRange.start || dateRange.end || eventFilter ? (
-                        <>
-                          <p className="text-4xl mb-2">🔍</p>
-                          <p>Tidak ada log email dengan filter yang dipilih</p>
-                          <button 
-                            onClick={resetFilters}
-                            className="btn-secondary text-sm mt-3"
-                          >
-                            Reset Filter
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-4xl mb-2">📧</p>
-                          <p>Belum ada log email.</p>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-
-            {/* Pagination */}
-            {logs.length > 0 && (
-              <div className="p-3 border-t border-ink-700/10">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <div className="text-sm text-ink-700/50">
-                    Menampilkan {pagination.total > 0 ? ((pagination.currentPage - 1) * pagination.perPage) + 1 : 0} -{' '}
-                    {Math.min(pagination.currentPage * pagination.perPage, pagination.total)} dari{' '}
-                    {pagination.total} data
-                  </div>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {renderPaginationButtons()}
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+      {/* SMTP check banner — beneran menguji koneksi, bukan dekorasi */}
+      <div className="bg-blue-600 rounded-2xl p-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> Butuh Bantuan Optimasi Email?</h2>
+          <p className="text-sm text-blue-100 mt-1 max-w-xl">
+            Pastikan konfigurasi SMTP di file <code className="bg-white/10 px-1.5 py-0.5 rounded">.env</code> backend sudah benar untuk menghindari kegagalan pengiriman.
+          </p>
+          {smtpResult && (
+            <p className={`text-sm mt-2 font-medium ${smtpResult.ok ? 'text-emerald-200' : 'text-red-200'}`}>
+              {smtpResult.ok ? '✓ ' : '✗ '}{smtpResult.message}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={handleCheckSmtp}
+          disabled={checkingSmtp}
+          className="shrink-0 bg-white hover:bg-blue-50 text-blue-700 font-semibold px-5 py-2.5 rounded-lg text-sm disabled:opacity-60"
+        >
+          {checkingSmtp ? 'Menguji...' : 'Cek Konfigurasi SMTP'}
+        </button>
       </div>
     </DashboardLayout>
   );
