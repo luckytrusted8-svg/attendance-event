@@ -1,5 +1,12 @@
 const prisma = require('../config/db');
 
+/**
+ * POST /api/attendance/scan
+ * Check-in via pemindaian QR Code peserta (kamera web-based scanner).
+ * Body: { qrCode }
+ * - Mencocokkan qrCode dengan data registrasi
+ * - Mencegah check-in ganda (satu Registration hanya maksimal satu Attendance)
+ */
 async function checkInByScan(req, res) {
   const { qrCode } = req.body;
   try {
@@ -34,7 +41,7 @@ async function checkInByScan(req, res) {
       message: `Check-in berhasil untuk ${registration.user.fullname}.`,
       data: {
         attendance,
-        participant: { fullname: registration.user.fullname, email: registration.user.email },
+        participant: { fullname: registration.user.fullname, email: registration.user.email, qrCode: registration.qrCode },
         event: { id: registration.event.id, title: registration.event.title },
       },
     });
@@ -43,6 +50,11 @@ async function checkInByScan(req, res) {
   }
 }
 
+/**
+ * POST /api/attendance/manual
+ * Fallback check-in manual berdasarkan nama/email/ID registrasi ketika QR Code tidak tersedia.
+ * Body: { registrationId } atau { eventId, keyword } untuk pencarian
+ */
 async function checkInManual(req, res) {
   const { registrationId, eventId, keyword } = req.body;
   try {
@@ -88,14 +100,17 @@ async function checkInManual(req, res) {
     return res.status(201).json({
       success: true,
       message: `Check-in manual berhasil untuk ${registration.user.fullname}.`,
-      data: { attendance, participant: { fullname: registration.user.fullname, email: registration.user.email } },
+      data: { attendance, participant: { fullname: registration.user.fullname, email: registration.user.email, qrCode: registration.qrCode } },
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Terjadi kesalahan server.', error: err.message });
   }
 }
 
-
+/**
+ * GET /api/attendance/event/:eventId
+ * Daftar kehadiran per event, diperbarui otomatis secara berkala (polling) oleh frontend.
+ */
 async function listAttendanceByEvent(req, res) {
   try {
     const eventId = Number(req.params.eventId);
@@ -112,6 +127,7 @@ async function listAttendanceByEvent(req, res) {
       id: a.id,
       fullname: a.registration.user.fullname,
       email: a.registration.user.email,
+      qrCode: a.registration.qrCode,
       checkInTime: a.checkInTime,
       method: a.attendanceMethod,
       status: a.attendanceStatus,

@@ -10,11 +10,12 @@ const attendanceRoutes = require('./routes/attendanceRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
 
 const app = express();
 
 app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
-app.use(express.json({ limit: '15mb' })); 
+app.use(express.json({ limit: '15mb' })); // limit besar untuk foto event base64
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use(morgan('dev'));
 
@@ -29,11 +30,14 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admins', adminRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/categories', categoryRoutes);
 
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} tidak ditemukan.` });
 });
 
+// Global error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ success: false, message: 'Terjadi kesalahan internal server.' });
@@ -41,5 +45,5 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
+  console.log(`✅ Server berjalan di http://localhost:${PORT}`);
 });

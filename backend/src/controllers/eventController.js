@@ -1,6 +1,10 @@
 const prisma = require('../config/db');
 const { generateQrDataUrl } = require('../utils/qrcode');
 
+/**
+ * Menentukan kategori event berdasarkan tanggal & jam saat ini:
+ * "ongoing" (Sedang Berlangsung), "upcoming" (Akan Datang), "finished" (Telah Berakhir)
+ */
 function computeEventPhase(event) {
   const now = new Date();
   const start = combineDateTime(event.eventDate, event.startTime);
@@ -18,15 +22,28 @@ function combineDateTime(dateVal, timeVal) {
   return combined;
 }
 
+/**
+ * POST /api/events
+ * Membuat event baru (khusus Admin Level 1). Otomatis generate QR Code event.
+ */
 async function createEvent(req, res) {
-  const { title, description, location, eventDate, startTime, endTime, imageUrl, status } = req.body;
+  const {
+    title, description, location, category, capacity, isOnline, isPaid, price, agenda,
+    eventDate, startTime, endTime, imageUrl, status,
+  } = req.body;
   try {
     const event = await prisma.event.create({
       data: {
         adminId: req.admin.id,
         title,
         description,
-        location,
+        location: isOnline ? (location || 'Online') : location,
+        category: category || null,
+        capacity: capacity ? Number(capacity) : null,
+        isOnline: Boolean(isOnline),
+        isPaid: Boolean(isPaid),
+        price: isPaid && price ? Number(price) : null,
+        agenda: Array.isArray(agenda) && agenda.length > 0 ? agenda : undefined,
         eventDate: new Date(eventDate),
         startTime: new Date(`1970-01-01T${startTime}:00Z`),
         endTime: new Date(`1970-01-01T${endTime}:00Z`),
@@ -40,6 +57,12 @@ async function createEvent(req, res) {
   }
 }
 
+/**
+ * GET /api/events
+ * Daftar event. Publik: hanya status "published", dikelompokkan (ongoing/upcoming/finished).
+ * Admin (terautentikasi): seluruh event miliknya / semua event.
+ * Query: ?search=&status=&phase=
+ */
 async function listEvents(req, res) {
   try {
     const { search = '', phase, status } = req.query;
@@ -78,7 +101,9 @@ async function listEvents(req, res) {
   }
 }
 
-
+/**
+ * GET /api/events/:id
+ */
 async function getEventById(req, res) {
   try {
     const id = Number(req.params.id);
@@ -99,6 +124,10 @@ async function getEventById(req, res) {
   }
 }
 
+/**
+ * GET /api/events/:id/qr
+ * QR Code Event -> berisi tautan langsung ke halaman registrasi event (untuk dicetak/disebar)
+ */
 async function getEventQr(req, res) {
   try {
     const id = Number(req.params.id);
@@ -113,6 +142,10 @@ async function getEventQr(req, res) {
   }
 }
 
+/**
+ * GET /api/events/:id/stats
+ * Statistik per event: total pendaftar, total hadir, attendance rate
+ */
 async function getEventStats(req, res) {
   try {
     const id = Number(req.params.id);
@@ -130,6 +163,10 @@ async function getEventStats(req, res) {
   }
 }
 
+/**
+ * PATCH /api/events/:id/background
+ * Mengubah gambar/banner latar event (dipakai juga untuk latar tampilan Scanner per perangkat)
+ */
 async function updateEventBackground(req, res) {
   try {
     const id = Number(req.params.id);
@@ -141,6 +178,10 @@ async function updateEventBackground(req, res) {
   }
 }
 
+/**
+ * PATCH /api/events/:id/status
+ * Mengubah status event: draft | published | closed (khusus Admin Level 1)
+ */
 async function updateEventStatus(req, res) {
   try {
     const id = Number(req.params.id);
@@ -155,6 +196,10 @@ async function updateEventStatus(req, res) {
   }
 }
 
+/**
+ * GET /api/events/dashboard/stats
+ * Ringkasan statistik dashboard: total event, total peserta, event aktif, attendance rate keseluruhan
+ */
 async function getDashboardStats(req, res) {
   try {
     const totalEvents = await prisma.event.count();
@@ -173,6 +218,10 @@ async function getDashboardStats(req, res) {
   }
 }
 
+/**
+ * GET /api/events/dashboard/activity
+ * Log aktivitas terbaru (pendaftaran baru & check-in) lintas seluruh event
+ */
 async function getDashboardActivity(req, res) {
   try {
     const recentRegistrations = await prisma.registration.findMany({
@@ -209,6 +258,11 @@ async function getDashboardActivity(req, res) {
   }
 }
 
+/**
+ * GET /api/events/dashboard/weekly-attendance
+ * Jumlah check-in aktual per hari selama 7 hari terakhir (data nyata dari tabel attendances,
+ * dipakai untuk grafik "Kehadiran Mingguan" pada Dashboard).
+ */
 async function getWeeklyAttendance(req, res) {
   try {
     const days = [];
@@ -248,8 +302,77 @@ async function getWeeklyAttendance(req, res) {
   }
 }
 
+/**
+ * PUT /api/events/:id
+ * Edit detail event (judul, deskripsi, lokasi, kategori, kapasitas, jadwal, foto) — khusus Admin Level 1
+ */
+async function updateEvent(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const {
+      title, description, location, category, capacity, isOnline, isPaid, price, agenda,
+      eventDate, startTime, endTime, imageUrl,
+    } = req.body;
+
+    const existing = await prisma.event.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Event tidak ditemukan.' });
+
+    const event = await prisma.event.update({
+      where: { id },
+      data: {
+        title: title ?? existing.title,
+        description: description ?? existing.description,
+        location: location ?? existing.location,
+        category: category ?? existing.category,
+        capacity: capacity !== undefined && capacity !== '' ? Number(capacity) : existing.capacity,
+        isOnline: isOnline !== undefined ? Boolean(isOnline) : existing.isOnline,
+        isPaid: isPaid !== undefined ? Boolean(isPaid) : existing.isPaid,
+        price: isPaid !== undefined ? (isPaid && price ? Number(price) : null) : existing.price,
+        agenda: Array.isArray(agenda) ? agenda : existing.agenda,
+        eventDate: eventDate ? new Date(eventDate) : existing.eventDate,
+        startTime: startTime ? new Date(`1970-01-01T${startTime}:00Z`) : existing.startTime,
+        endTime: endTime ? new Date(`1970-01-01T${endTime}:00Z`) : existing.endTime,
+        imageUrl: imageUrl !== undefined ? imageUrl : existing.imageUrl,
+      },
+    });
+    return res.json({ success: true, message: 'Event berhasil diperbarui.', data: event });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server.', error: err.message });
+  }
+}
+
+/**
+ * DELETE /api/events/:id
+ * Menghapus event beserta seluruh data terkait (registrasi, kehadiran, log email) — khusus Admin Level 1.
+ * Dilakukan dalam satu transaksi agar tidak melanggar foreign key constraint.
+ */
+async function deleteEvent(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const existing = await prisma.event.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Event tidak ditemukan.' });
+
+    const registrationIds = (
+      await prisma.registration.findMany({ where: { eventId: id }, select: { id: true } })
+    ).map((r) => r.id);
+
+    await prisma.$transaction([
+      prisma.emailLog.deleteMany({ where: { registrationId: { in: registrationIds } } }),
+      prisma.attendance.deleteMany({ where: { registrationId: { in: registrationIds } } }),
+      prisma.registration.deleteMany({ where: { eventId: id } }),
+      prisma.event.delete({ where: { id } }),
+    ]);
+
+    return res.json({ success: true, message: 'Event beserta seluruh data terkait berhasil dihapus.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server.', error: err.message });
+  }
+}
+
 module.exports = {
   createEvent,
+  updateEvent,
+  deleteEvent,
   listEvents,
   getEventById,
   getEventQr,

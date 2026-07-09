@@ -36,7 +36,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0">
+    <aside className="w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0 print:hidden">
       <div className="px-5 py-6">
         <p className="text-lg font-extrabold tracking-tight text-slate-900">
           Event<span className="text-blue-600">Digital</span>

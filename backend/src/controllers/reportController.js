@@ -1,16 +1,21 @@
 const prisma = require('../config/db');
-const PDFDocument = require('pdfkit');
-const ExcelJS = require('exceljs');
 
+/**
+ * GET /api/reports
+ * Halaman Laporan Analitik: rekap performa pendaftaran, kehadiran, dan estimasi pendapatan tiket per event.
+ * Query opsional: ?days= (rentang tren registrasi harian, default 30)
+ *
+ * Catatan jujur: "Pendapatan" di sini adalah ESTIMASI (harga tiket × jumlah pendaftar event berbayar).
+ * Sistem ini tidak memproses pembayaran sungguhan, jadi angka ini bukan pendapatan yang telah dikonfirmasi diterima.
+ */
 async function getReports(req, res) {
   try {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 90);
+
     const events = await prisma.event.findMany({
-      include: {
-        _count: { select: { registrations: true } },
-      },
+      include: { _count: { select: { registrations: true } } },
       orderBy: { eventDate: 'desc' },
     });
-    
 
     const perEvent = await Promise.all(
       events.map(async (e) => {
@@ -19,14 +24,19 @@ async function getReports(req, res) {
         });
         const totalRegistrations = e._count.registrations;
         const attendanceRate = totalRegistrations > 0 ? Math.round((totalAttended / totalRegistrations) * 100) : 0;
+        const revenue = e.isPaid && e.price ? e.price * totalRegistrations : 0;
         return {
           eventId: e.id,
           title: e.title,
           eventDate: e.eventDate,
           status: e.status,
+          category: e.category,
+          location: e.location,
+          isPaid: e.isPaid,
           totalRegistrations,
           totalAttended,
           attendanceRate,
+          revenue,
         };
       })
     );
@@ -34,8 +44,53 @@ async function getReports(req, res) {
     const totalEvents = events.length;
     const totalRegistrationsAll = perEvent.reduce((sum, e) => sum + e.totalRegistrations, 0);
     const totalAttendedAll = perEvent.reduce((sum, e) => sum + e.totalAttended, 0);
+    const totalRevenue = perEvent.reduce((sum, e) => sum + e.revenue, 0);
     const overallAttendanceRate =
       totalRegistrationsAll > 0 ? Math.round((totalAttendedAll / totalRegistrationsAll) * 100) : 0;
+
+    const mostPopular = [...perEvent].sort((a, b) => b.totalRegistrations - a.totalRegistrations)[0] || null;
+
+    // Revenue per kategori (hanya event berbayar yang punya kontribusi)
+    const revenueMap = {};
+    perEvent.forEach((e) => {
+      const key = e.category || 'Tanpa Kategori';
+      revenueMap[key] = (revenueMap[key] || 0) + e.revenue;
+    });
+    const revenueByCategory = Object.entries(revenueMap)
+      .filter(([, revenue]) => revenue > 0)
+      .map(([category, revenue]) => ({
+        category,
+        revenue,
+        percentage: totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 100) : 0,
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    // Tren registrasi & check-in harian (data asli dari tabel registrations & attendances)
+    const rangeStart = new Date();
+    rangeStart.setDate(rangeStart.getDate() - (days - 1));
+    rangeStart.setHours(0, 0, 0, 0);
+
+    const [registrationsInRange, attendancesInRange] = await Promise.all([
+      prisma.registration.findMany({ where: { createdAt: { gte: rangeStart } }, select: { createdAt: true } }),
+      prisma.attendance.findMany({ where: { checkInTime: { gte: rangeStart } }, select: { checkInTime: true } }),
+    ]);
+
+    const dayKey = (d) => new Date(d).toISOString().slice(0, 10);
+    const trendMap = {};
+    for (let i = 0; i < days; i++) {
+      const d = new Date(rangeStart); d.setDate(d.getDate() + i);
+      trendMap[dayKey(d)] = { date: dayKey(d), registrations: 0, checkins: 0 };
+    }
+    registrationsInRange.forEach((r) => {
+      const key = dayKey(r.createdAt);
+      if (trendMap[key]) trendMap[key].registrations += 1;
+    });
+    attendancesInRange.forEach((a) => {
+      if (!a.checkInTime) return;
+      const key = dayKey(a.checkInTime);
+      if (trendMap[key]) trendMap[key].checkins += 1;
+    });
+    const registrationTrend = Object.values(trendMap);
 
     return res.json({
       success: true,
@@ -45,8 +100,12 @@ async function getReports(req, res) {
           totalRegistrations: totalRegistrationsAll,
           totalAttended: totalAttendedAll,
           overallAttendanceRate,
+          totalRevenue,
+          mostPopularEvent: mostPopular ? { title: mostPopular.title, totalRegistrations: mostPopular.totalRegistrations } : null,
         },
         perEvent,
+        revenueByCategory,
+        registrationTrend,
       },
     });
   } catch (err) {
@@ -54,300 +113,4 @@ async function getReports(req, res) {
   }
 }
 
-async function exportPdf(req, res) {
-  try {
-    const events = await prisma.event.findMany({
-      include: {
-        _count: {
-          select: {
-            registrations: true,
-          },
-        },
-      },
-      orderBy: {
-        eventDate: 'desc',
-      },
-    });
-
-    const perEvent = await Promise.all(
-      events.map(async (e) => {
-        const totalAttended = await prisma.attendance.count({
-          where: {
-            registration: {
-              eventId: e.id,
-            },
-            attendanceStatus: 'hadir',
-          },
-        });
-
-        const totalRegistrations = e._count.registrations;
-
-        return {
-          title: e.title,
-          eventDate: e.eventDate,
-          status: e.status,
-          totalRegistrations,
-          totalAttended,
-          attendanceRate:
-            totalRegistrations > 0
-              ? Math.round((totalAttended / totalRegistrations) * 100)
-              : 0,
-        };
-      })
-    );
-
-    const totalEvents = perEvent.length;
-    const totalRegistrations = perEvent.reduce(
-      (a, b) => a + b.totalRegistrations,
-      0
-    );
-
-    const totalAttended = perEvent.reduce(
-      (a, b) => a + b.totalAttended,
-      0
-    );
-
-    const attendanceRate =
-      totalRegistrations > 0
-        ? Math.round((totalAttended / totalRegistrations) * 100)
-        : 0;
-
-    const doc = new PDFDocument({
-      margin: 40,
-      size: 'A4',
-    });
-
-    res.setHeader('Content-Type', 'application/pdf');
-
-    res.setHeader(
-      'Content-Disposition',
-      'attachment; filename=Laporan-Event.pdf'
-    );
-
-    doc.pipe(res);
-
-    // ======================
-    // HEADER
-    // ======================
-
-    doc
-      .fontSize(22)
-      .fillColor('#2563eb')
-      .text('Attendance Event Report', {
-        align: 'center',
-      });
-
-    doc.moveDown(0.3);
-
-    doc
-      .fontSize(11)
-      .fillColor('black')
-      .text(
-        `Tanggal Export : ${new Date().toLocaleDateString('id-ID')}`,
-        {
-          align: 'center',
-        }
-      );
-
-    doc.moveDown(2);
-
-    // ======================
-    // SUMMARY
-    // ======================
-
-    doc.fontSize(16).text('Ringkasan');
-
-    doc.moveDown();
-
-    doc.fontSize(12);
-
-    doc.text(`Total Event             : ${totalEvents}`);
-
-    doc.text(`Total Pendaftar         : ${totalRegistrations}`);
-
-    doc.text(`Total Hadir             : ${totalAttended}`);
-
-    doc.text(`Attendance Rate         : ${attendanceRate}%`);
-
-    doc.moveDown(2);
-
-    // ======================
-    // TABLE HEADER
-    // ======================
-
-    doc.fontSize(15).text('Laporan Per Event');
-
-    doc.moveDown();
-
-    doc.fontSize(11);
-
-    doc.text(
-      '--------------------------------------------------------------------------------------------'
-    );
-
-    doc.text(
-      'Event                  Tanggal        Status      Daftar     Hadir     Rate'
-    );
-
-    doc.text(
-      '--------------------------------------------------------------------------------------------'
-    );
-
-    perEvent.forEach((item) => {
-      const tanggal = new Date(item.eventDate).toLocaleDateString('id-ID');
-
-      doc.text(
-        `${item.title.substring(0,20).padEnd(22)}
-${tanggal.padEnd(14)}
-${item.status.padEnd(10)}
-${String(item.totalRegistrations).padEnd(10)}
-${String(item.totalAttended).padEnd(10)}
-${item.attendanceRate}%`
-      );
-    });
-
-    doc.moveDown();
-
-    doc.text(
-      '--------------------------------------------------------------------------------------------'
-    );
-
-    doc.moveDown(2);
-
-    // ======================
-    // FOOTER
-    // ======================
-
-    doc
-      .fontSize(10)
-      .fillColor('gray')
-      .text(
-        'Generated by Attendance Event Management System',
-        {
-          align: 'center',
-        }
-      );
-
-    doc.end();
-  } catch (err) {
-    console.log(err);
-
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
-}
-async function exportExcel(req, res) {
-  try {
-    const events = await prisma.event.findMany({
-      include: {
-        _count: {
-          select: {
-            registrations: true,
-          },
-        },
-      },
-      orderBy: {
-        eventDate: 'desc',
-      },
-    });
-
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Laporan Event');
-
-    worksheet.columns = [
-      { header: 'No', key: 'no', width: 8 },
-      { header: 'Nama Event', key: 'title', width: 35 },
-      { header: 'Tanggal Event', key: 'date', width: 18 },
-      { header: 'Status', key: 'status', width: 18 },
-      { header: 'Total Pendaftar', key: 'registrations', width: 18 },
-      { header: 'Total Hadir', key: 'attended', width: 18 },
-      { header: 'Attendance Rate', key: 'rate', width: 18 },
-    ];
-
-    worksheet.getRow(1).font = {
-      bold: true,
-      color: { argb: 'FFFFFFFF' },
-    };
-
-    worksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: '2563EB' },
-    };
-
-    worksheet.getRow(1).alignment = {
-      vertical: 'middle',
-      horizontal: 'center',
-    };
-
-    let no = 1;
-
-    for (const event of events) {
-      const totalAttended = await prisma.attendance.count({
-        where: {
-          registration: {
-            eventId: event.id,
-          },
-          attendanceStatus: 'hadir',
-        },
-      });
-
-      const totalRegistrations = event._count.registrations;
-
-      const attendanceRate =
-        totalRegistrations > 0
-          ? Math.round((totalAttended / totalRegistrations) * 100)
-          : 0;
-
-      worksheet.addRow({
-        no: no++,
-        title: event.title,
-        date: new Date(event.eventDate).toLocaleDateString('id-ID'),
-        status: event.status,
-        registrations: totalRegistrations,
-        attended: totalAttended,
-        rate: attendanceRate + '%',
-      });
-    }
-
-    worksheet.eachRow((row) => {
-      row.eachCell((cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          bottom: { style: 'thin' },
-          left: { style: 'thin' },
-          right: { style: 'thin' },
-        };
-      });
-    });
-
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    );
-
-    res.setHeader(
-      'Content-Disposition',
-      'attachment; filename=Laporan-Event.xlsx'
-    );
-
-    await workbook.xlsx.write(res);
-
-    res.end();
-  } catch (err) {
-    console.log(err);
-
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
-}
-
-module.exports = {
-  getReports,
-  exportPdf,
-  exportExcel,
-};
+module.exports = { getReports };

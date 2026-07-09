@@ -141,7 +141,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5 mb-5">
-        {/* Weekly attendance — real data */}
+        
         <div className="bg-white rounded-2xl border border-slate-200 p-5">
           <h2 className="text-base font-bold text-slate-900 mb-5">Kehadiran Mingguan</h2>
           <div className="flex items-end justify-between gap-2 h-32 mb-2">
@@ -187,8 +187,6 @@ export default function Dashboard() {
             {activity.length === 0 && <p className="text-sm text-slate-400 text-center py-6">Belum ada aktivitas.</p>}
           </ul>
         </div>
-
-        {/* Real status distribution — replaces fabricated "Need Assistance" panel */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5">
           <h2 className="text-base font-bold text-slate-900 mb-4">Distribusi Status Event</h2>
           <div className="space-y-4">

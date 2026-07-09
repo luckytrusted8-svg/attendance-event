@@ -53,12 +53,26 @@ model User {
   @@map("users")
 }
 
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("categories")
+}
+
 model Event {
   id          Int      @id @default(autoincrement())
   adminId     Int      @map("admin_id")
   title       String   @db.VarChar(200)
   description String?  @db.Text
   location    String?  @db.VarChar(255)
+  category    String?  @db.VarChar(100)
+  capacity    Int?
+  isOnline    Boolean  @default(false) @map("is_online")
+  isPaid      Boolean  @default(false) @map("is_paid")
+  price       Int?     // harga tiket dalam Rupiah, null/0 jika gratis. Informasi saja — sistem tidak memproses pembayaran.
+  agenda      Json?    // rundown acara: [{ time: "19.00 - 19.05", title: "...", speaker: "..." }, ...]
   eventDate   DateTime @map("event_date") @db.Date
   startTime   DateTime @map("start_time") @db.Time()
   endTime     DateTime @map("end_time") @db.Time()

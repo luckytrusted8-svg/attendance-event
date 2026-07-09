@@ -31,15 +31,15 @@ export default function AdminLogin() {
 
   return (
     <div className="min-h-screen bg-slate-100 relative overflow-hidden flex items-center justify-center p-4">
-      {/* Page-level decorative blobs */}
+      
       <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-indigo-200/60" />
       <div className="absolute -bottom-32 -right-10 w-72 h-72 rounded-full bg-indigo-300/50" />
       <div className="absolute bottom-10 right-1/3 w-4 h-4 rounded-full bg-indigo-300" />
 
       <div className="relative w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden grid md:grid-cols-2">
-        {/* Left panel — illustrative */}
+      
         <div className="relative hidden md:flex flex-col justify-center gap-5 p-12 bg-indigo-500 text-white overflow-hidden">
-          {/* Decorative shapes: top-left cluster */}
+      
           <div className="absolute top-10 left-10 w-8 h-8 rounded-full border-2 border-white/50" />
           <div className="absolute top-16 left-24 w-2 h-2 rounded-full bg-teal-300" />
           <div
@@ -49,7 +49,7 @@ export default function AdminLogin() {
           <div className="absolute top-6 left-52 w-5 h-24 rounded-full bg-white/25 rotate-6" />
           <div className="absolute top-14 left-60 w-5 h-16 rounded-full bg-white/15 -rotate-6" />
 
-          {/* Headline */}
+      
           <div className="relative z-10 mt-16">
             <h1 className="text-5xl font-extrabold leading-tight mb-4">
               Kehadiran<br />jadi mudah.
@@ -59,7 +59,7 @@ export default function AdminLogin() {
             </p>
           </div>
 
-          {/* Decorative shapes: bottom cluster */}
+          
           <div className="absolute bottom-16 left-10 w-3 h-3 rounded-full bg-teal-300" />
           <div
             className="absolute bottom-6 left-8 w-16 h-14 opacity-60"

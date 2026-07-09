@@ -2,6 +2,8 @@ const express = require('express');
 const { body } = require('express-validator');
 const {
   createEvent,
+  updateEvent,
+  deleteEvent,
   listEvents,
   getEventById,
   getEventQr,
@@ -12,22 +14,25 @@ const {
   getDashboardActivity,
   getWeeklyAttendance,
 } = require('../controllers/eventController');
-const { registerToEvent, listEventRegistrations } = require('../controllers/registrationController');
+const { registerToEvent, manualRegisterToEvent, listEventRegistrations } = require('../controllers/registrationController');
 const { handleValidation } = require('../middleware/validate');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Middleware opsional: jika token tersedia, sisipkan req.admin; jika tidak, biarkan publik (landing page)
 async function optionalAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
   if (!authHeader.startsWith('Bearer ')) return next();
   return requireAuth(req, res, next);
 }
 
+// --- Dashboard (khusus admin) ---
 router.get('/dashboard/stats', requireAuth, getDashboardStats);
 router.get('/dashboard/activity', requireAuth, getDashboardActivity);
 router.get('/dashboard/weekly-attendance', requireAuth, getWeeklyAttendance);
 
+// --- Event CRUD ---
 router.post(
   '/',
   requireAuth,
@@ -47,6 +52,9 @@ router.get('/:id', getEventById);
 router.get('/:id/qr', getEventQr);
 router.get('/:id/stats', requireAuth, getEventStats);
 
+router.put('/:id', requireAuth, requireRole('Admin Level 1'), updateEvent);
+router.delete('/:id', requireAuth, requireRole('Admin Level 1'), deleteEvent);
+
 router.patch('/:id/background', requireAuth, updateEventBackground);
 router.patch(
   '/:id/status',
@@ -57,6 +65,7 @@ router.patch(
   updateEventStatus
 );
 
+// --- Registrations (nested di bawah event) ---
 router.post(
   '/:eventId/registrations',
   [
@@ -69,5 +78,17 @@ router.post(
 );
 
 router.get('/:eventId/registrations', requireAuth, listEventRegistrations);
+
+router.post(
+  '/:eventId/registrations/manual',
+  requireAuth,
+  requireRole('Admin Level 1'),
+  [
+    body('fullname').notEmpty().withMessage('Nama lengkap wajib diisi.'),
+    body('email').isEmail().withMessage('Email tidak valid.'),
+  ],
+  handleValidation,
+  manualRegisterToEvent
+);
 
 module.exports = router;

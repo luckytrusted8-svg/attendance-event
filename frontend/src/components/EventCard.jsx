@@ -49,12 +49,20 @@ export default function EventCard({ event }) {
           </div>
         )}
         <div className="absolute top-3 left-3">{badgeByPhase[event.phase]}</div>
+        <div className="absolute top-3 right-3">
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${event.isPaid ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
+            {event.isPaid ? `Rp ${Number(event.price || 0).toLocaleString('id-ID')}` : 'Gratis'}
+          </span>
+        </div>
       </div>
 
       <div className="p-5 flex flex-col gap-2 flex-1">
+        {event.category && (
+          <span className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide w-fit">{event.category}</span>
+        )}
         <h3 className="font-bold text-slate-900 leading-snug line-clamp-2">{event.title}</h3>
         <p className="text-xs text-slate-500 flex items-center gap-1">
-          📍 {event.location || 'Lokasi menyusul'}
+          📍 {event.isOnline ? 'Online Event' : (event.location || 'Lokasi menyusul')}
         </p>
         <p className="text-xs text-slate-500 flex items-center gap-1">
           🗓 {formatDate(event.eventDate)} · {formatTime(event.startTime)}–{formatTime(event.endTime)}

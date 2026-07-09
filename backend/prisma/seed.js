@@ -51,6 +51,12 @@ async function main() {
     },
   });
 
+  console.log('Seeding kategori event...');
+  const defaultCategories = ['Konferensi', 'Workshop', 'Seminar', 'Networking', 'Exhibition', 'Webinar'];
+  for (const name of defaultCategories) {
+    await prisma.category.upsert({ where: { name }, update: {}, create: { name } });
+  }
+
   console.log('Seeding done.');
   console.log('Login Admin Level 1 -> admin1@event.com / admin123');
   console.log('Login Admin Level 2 -> admin2@event.com / admin123');
